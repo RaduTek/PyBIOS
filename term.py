@@ -58,7 +58,7 @@ def fill(x: int, y: int, w: int, h: int, c: str = " "):
         rawprint(c * w)
 
 
-borderChr = {
+borders = {
     "we": "\u2500",
     "ns": "\u2502",
     "se": "\u250C",
@@ -72,14 +72,28 @@ borderChr = {
     "nswe": "\u253C",
 }
 
+arrows = {
+    "n": "\u25B2",
+    "s": "\u25BC",
+    "w": "\u25C0",
+    "e": "\u25B6",
+}
+
+blocks = {
+    "full": "\u2588",  # Full block
+    "uh": "\u2580",  # Upper half
+    "lh": "\u2584",  # Lower half
+    "ls": "\u2591",  # Light shade
+    "ms": "\u2592",  # Medium shade
+    "hs": "\u2593",  # Heavy shade
+}
+
 
 class borderProfiles:
-    top = borderChr["se"] + borderChr["we"] + borderChr["swe"] + borderChr["sw"]
-    middle = borderChr["ns"] + " " + borderChr["ns"] + borderChr["ns"]
-    middle_vsplit = (
-        borderChr["nse"] + borderChr["we"] + borderChr["nswe"] + borderChr["nsw"]
-    )
-    bottom = borderChr["ne"] + borderChr["we"] + borderChr["nwe"] + borderChr["nw"]
+    top = borders["se"] + borders["we"] + borders["swe"] + borders["sw"]
+    middle = borders["ns"] + " " + borders["ns"] + borders["ns"]
+    middle_vsplit = borders["nse"] + borders["we"] + borders["nswe"] + borders["nsw"]
+    bottom = borders["ne"] + borders["we"] + borders["nwe"] + borders["nw"]
 
 
 def gen_box_line(w: int, splits: list[int], chars: str) -> str:
@@ -141,7 +155,15 @@ def draw_text(text: str, x: int, y: int, w: int = 0, h: int = 0):
             rawprint(lines[i])
 
 
-def draw_text_centered(text: str, x: int, y: int, w: int, h: int, spaceChr: str = " "):
+def draw_text_centered(text: str, x: int, y: int, w: int, space: str = " "):
+    set_pos(x, y)
+    extra = w - len(text)
+    rawprint(space * math.floor(extra / 2), text, space * math.ceil(extra / 2))
+
+
+def draw_textblock_centered(
+    text: str, x: int, y: int, w: int, h: int, space: str = " "
+):
     lines = []
     for l in text.splitlines():
         lines += textwrap.wrap(l, w)
@@ -153,9 +175,7 @@ def draw_text_centered(text: str, x: int, y: int, w: int, h: int, spaceChr: str 
     for i in range(h):
         set_pos(x, y + i)
         extra = w - len(lines[i])
-        rawprint(
-            spaceChr * math.floor(extra / 2), lines[i], spaceChr * math.ceil(extra / 2)
-        )
+        rawprint(space * math.floor(extra / 2), lines[i], space * math.ceil(extra / 2))
 
 
 def beep():
