@@ -26,7 +26,7 @@ def draw_dialog(w: int, h: int, title: str, buttonBox: bool = True) -> tuple[int
     # Draw shadow
     term.bgcolor(term.colors.black)
     term.fill(x + 1, y + h, w, 1)
-    term.fill(x + w, y + 1, 1, h)
+    term.fill(x + w, y + 1, 2, h)
 
     # Draw dialog box
     term.color(term.colors.bright + term.colors.white)
@@ -34,7 +34,7 @@ def draw_dialog(w: int, h: int, title: str, buttonBox: bool = True) -> tuple[int
     term.draw_box(x, y, w, h, [], [h - 2] if buttonBox else [])
 
     # Draw title text
-    term.draw_text_centered(f" {title} ", x + 1, y, w - 2, 1, term.borderChr["we"])
+    term.draw_text_centered(f" {title} ", x + 1, y, w - 2, term.borders["we"])
 
     # Return position of dialog
     return x, y
@@ -101,7 +101,7 @@ def message_box(title: str, text: str, options: list[str], selected: int = 0) ->
     dialog_height = content_height + 6
 
     x, y = draw_dialog(dialog_width, dialog_height, title)
-    term.draw_text_centered(text, x + 2, y + 1, content_width, content_height + 2)
+    term.draw_textblock_centered(text, x + 2, y + 1, content_width, content_height + 2)
 
     while True:
         draw_message_box_options(
@@ -120,8 +120,30 @@ def message_box(title: str, text: str, options: list[str], selected: int = 0) ->
             term.beep()
 
 
+def get_items_to_draw(items: list[str], selected: int, prev_start: int, prev_end: int):
+    start_index = prev_start
+    end_index = prev_end
+
+    if selected < prev_start:
+        start_index -= prev_start - selected
+        end_index -= prev_start - selected
+    elif selected >= prev_end:
+        start_index += selected - prev_end + 1
+        end_index += selected - prev_end + 1
+
+    items_draw = items[start_index:end_index]
+    return items_draw, start_index, end_index
+
+
 def draw_select_box_items(
-    x: int, y: int, w: int, h: int, items: list[str], selected: int = 0
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    items: list[str],
+    selected: int,
+    prev_start: int,
+    prev_end: int,
 ):
     def normal_color():
         term.color(term.colors.bright + term.colors.white)
@@ -131,13 +153,21 @@ def draw_select_box_items(
         term.bgcolor(term.colors.black)
 
     normal_color()
-    term.fill(x, y, w, h - 1)
+    term.fill(x, y, w, h)
 
-    items_draw = []
-    if selected > h:
-        items_draw = items[selected - h : h]
-    else:
-        items_draw = items[0:h]
+    items_draw, start_index, end_index = get_items_to_draw(
+        items, selected, prev_start, prev_end
+    )
+
+    has_items_before = start_index > 0
+    has_items_after = end_index < len(items)
+
+    term.draw_text(
+        term.arrows["n"] if has_items_before else term.borders["we"], x + w - 1, y - 1
+    )
+    term.draw_text(
+        term.arrows["s"] if has_items_after else term.borders["we"], x + w - 1, y + h
+    )
 
     for i in range(len(items_draw)):
         item = items_draw[i]
@@ -149,6 +179,8 @@ def draw_select_box_items(
 
         if item == items[selected]:
             normal_color()
+
+    return start_index, end_index
 
 
 def select_box(title: str, items: list[str], selected: int = 0) -> int:
@@ -164,16 +196,26 @@ def select_box(title: str, items: list[str], selected: int = 0) -> int:
 
     x, y = draw_dialog(content_width + 2, content_height + 2, title, False)
 
+    prev_start = 0
+    prev_end = content_height
+
     while True:
-        draw_select_box_items(
-            x + 1, y + 1, content_width, content_height, items, selected
+        prev_start, prev_end = draw_select_box_items(
+            x + 1,
+            y + 1,
+            content_width,
+            content_height,
+            items,
+            selected,
+            prev_start,
+            prev_end,
         )
 
         key = term.read_key()
 
-        if key == "LEFT":
+        if key == "UP":
             selected = max(0, selected - 1)
-        elif key == "RIGHT":
+        elif key == "DOWN":
             selected = min(selected + 1, len(items) - 1)
         elif key == "ENTER":
             return selected
@@ -247,8 +289,32 @@ def get_sel_index(items: list, offset: int = -1, reverse: bool = False):
     return offset
 
 
-def draw_items(items: list, selected: int, x: int, y: int, w: int, h: int):
-    term.bgcolor(term.colors.white)
+def draw_scrollbar(x: int, y: int, h: int, current: int, total: int):
+    if h > total:
+        return
+    term.color(term.colors.bright + term.colors.black)
+
+    sb_height = math.floor(h / total * (h - 2))
+    sb_offset = math.floor(current / total * (h - sb_height - 1))
+
+    term.fill(x, y + 1, 1, h - 1, term.blocks["ls"])
+
+    term.color(term.colors.blue)
+    term.draw_text(term.arrows["n"], x, y)
+    term.draw_text(term.arrows["s"], x, y + h - 1)
+    term.fill(x, y + sb_offset + 1, 1, sb_height, term.blocks["full"])
+
+
+def draw_items(
+    items: list,
+    selected: int,
+    prev_start: int,
+    prev_end: int,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+) -> tuple[int, int]:
 
     def normal_color():
         term.color(term.colors.bright + term.colors.black)
@@ -261,22 +327,29 @@ def draw_items(items: list, selected: int, x: int, y: int, w: int, h: int):
 
     pw = (w - 2) // 2
 
+    term.bgcolor(term.colors.white)
+    term.fill(x, y, w - 1, h)
+    draw_scrollbar(x + w - 1, y, h, selected, len(items))
+
+    items_draw, start_index, end_index = get_items_to_draw(
+        items, selected, prev_start, prev_end
+    )
+
     normal_color()
 
-    term.fill(x, y, w, h)
-
-    for i in range(len(items)):
-        item = items[i]
+    for i in range(len(items_draw)):
+        item = items_draw[i]
         if not item:
             continue
 
-        if i == selected:
+        if start_index + i == selected:
             selected_color()
         elif "type" in item:
             editable_color()
 
-        if "submenu" in item:
-            term.draw_text("\u25B6", x, y + i)
+        if "type" in item:
+            if item["type"] == "subpage":
+                term.draw_text(term.arrows["e"], x, y + i)
 
         term.draw_text(item["title"], x + 2, y + i, pw)
 
@@ -292,6 +365,8 @@ def draw_items(items: list, selected: int, x: int, y: int, w: int, h: int):
             term.draw_text(text, x + 2 + pw, y + i, pw)
 
         normal_color()
+
+    return start_index, end_index
 
 
 def exit_func():
@@ -343,7 +418,7 @@ main_items = [
     None,
     {
         "title": "Hardware Information",
-        "type": "option",
+        "type": "subpage",
         "help": "View details about installed hardware",
     },
 ]
@@ -353,15 +428,29 @@ boot_items = [
     {
         "title": "Boot mode",
         "type": "select",
-        "values": ["UEFI only", "UEFI and CSM", "Legacy"],
+        "values": [
+            "UEFI only",
+            "UEFI and CSM",
+            "Legacy",
+            "Legacy 1",
+            "Legacy 2",
+            "Legacy 3",
+            "Legacy 4",
+            "Legacy 5",
+            "Legacy 6",
+            "Legacy 7",
+            "Legacy 8",
+            "Legacy 9",
+        ],
         "value": 1,
         "help": "Set the UEFI boot mode\nUEFI and CSM = Boot both UEFI and legacy devices\n"
         + "UEFI = Boot only UEFI devices\nLegacy = Boot only legacy devices",
     },
     {
         "title": "Network boot",
-        "value": "Enabled",
-        "type": "option",
+        "type": "select",
+        "values": ["Disabled", "Enabled"],
+        "value": 1,
         "help": "Enable/Disable network boot",
     },
     None,
@@ -424,15 +513,19 @@ def bios_page(pages: list):
 
     keep_index = False
 
+    item_selected = 0
+    item_view_start = 0
+    item_view_end = 0
+
     while True:
         w, h = term.get_size()
 
         # Draw title texts
         term.color(term.colors.bright + term.colors.white)
         term.bgcolor(term.colors.blue)
-        term.draw_text_centered(title_string, 1, 1, w, 2)
+        term.draw_textblock_centered(title_string, 1, 1, w, 2)
         term.color(term.colors.white)
-        term.draw_text_centered(version_string, 1, h - 1, w, 2)
+        term.draw_textblock_centered(version_string, 1, h - 1, w, 2)
 
         # Draw tabs
         draw_tabs(tabs, page_index)
@@ -447,17 +540,28 @@ def bios_page(pages: list):
 
         page = pages[page_index]
         items = page["items"]
+        item_view_start = 0
+        item_view_end = h - 6
 
         if keep_index:
             keep_index = False
         else:
-            index = get_sel_index(items)
+            item_selected = get_sel_index(items)
 
         while True:
-            item = items[index]
+            item = items[item_selected]
 
             # Draw items
-            draw_items(items, index, 2, 4, w - help_width - 2, h - 7)
+            item_view_start, item_view_end = draw_items(
+                items,
+                item_selected,
+                item_view_start,
+                item_view_end,
+                2,
+                4,
+                w - help_width - 2,
+                h - 6,
+            )
 
             # Draw help text for currently selected item
             draw_help_text(item["help"] if "help" in item else item["title"])
@@ -468,26 +572,27 @@ def bios_page(pages: list):
 
             if key == "UP":
                 # Go to previous item
-                index = get_sel_index(items, index, True)
+                item_selected = get_sel_index(items, item_selected, True)
             elif key == "DOWN":
                 # Go to next item
-                index = get_sel_index(items, index)
+                item_selected = get_sel_index(items, item_selected)
             elif key == "ENTER":
                 # Execute current item's function if available
                 keep_index = True
                 if "type" in item:
                     if "function" in item:
                         item = item["function"](item)
-                        break
                     elif item["type"] == "select":
                         item = select_item(item)
-                        break
+                    break
             elif key == "LEFT":
                 # Go to previous page
+                keep_index = False
                 page_index = max(0, page_index - 1)
                 break
             elif key == "RIGHT":
                 # Go to next page
+                keep_index = False
                 page_index = min(len(pages) - 1, page_index + 1)
                 break
             elif key == "ESC":
