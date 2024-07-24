@@ -24,11 +24,12 @@ def get_selectable_index(items: List[Item], offset: int = -1, reverse: bool = Fa
     return offset
 
 
-PageGenerators = List[Callable]
+PageGenerator = Callable[[], Page]
+PageGenerators = List[PageGenerator]
 
 
-def new_page_generator(page: Page) -> Callable:
-    def generator():
+def new_page_generator(page: Page) -> PageGenerator:
+    def generator() -> Page:
         return page
 
     return generator
