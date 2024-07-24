@@ -1,6 +1,8 @@
 import math
 import term
-import textwrap
+import color
+import bios
+
 
 copyright_string = "Copyright (C) 2024 Company Inc."
 title_string = f"PyBIOS Setup Utility - {copyright_string}"
@@ -15,8 +17,34 @@ F10: Save and Exit
 ESC: Exit"""
 help_keys_count = len(help_keys.splitlines())
 
+ColorPair = tuple[int, int]
 
-def draw_dialog(w: int, h: int, title: str, buttonBox: bool = True) -> tuple[int, int]:
+dialog_palette: color.Palette = {
+    "normal": (color.blue, color.light + color.white),
+    "selected": (color.black, color.light + color.white),
+    "shadow": (color.black, color.light + color.black),
+}
+
+screen_palette: color.Palette = {
+    "normal": (color.white, color.blue),
+    "selected": (color.white, color.light + color.white),
+    "disabled": (color.white, color.light + color.black),
+}
+
+header_palette: color.Palette = {
+    "normal": (color.blue, color.light + color.white),
+    "selected": (color.white, color.blue),
+    "disabled": (color.blue, color.white),
+}
+
+
+def draw_dialog(
+    w: int,
+    h: int,
+    title: str,
+    buttonBox: bool = True,
+    palette: color.Palette = dialog_palette,
+) -> tuple[int, int]:
     tw, th = term.get_size()
 
     # Calculate center positions
@@ -24,13 +52,12 @@ def draw_dialog(w: int, h: int, title: str, buttonBox: bool = True) -> tuple[int
     y = (th - h) // 2
 
     # Draw shadow
-    term.bgcolor(term.colors.black)
+    term.set_color(palette["shadow"])
     term.fill(x + 1, y + h, w, 1)
     term.fill(x + w, y + 1, 2, h)
 
     # Draw dialog box
-    term.color(term.colors.bright + term.colors.white)
-    term.bgcolor(term.colors.blue)
+    term.set_color(palette["normal"])
     term.draw_box(x, y, w, h, [], [h - 2] if buttonBox else [])
 
     # Draw title text
@@ -40,30 +67,14 @@ def draw_dialog(w: int, h: int, title: str, buttonBox: bool = True) -> tuple[int
     return x, y
 
 
-def get_max_width(text: str) -> int:
-    width = 0
-    for l in text.splitlines():
-        width = max(len(l), width)
-    return width
-
-
-def get_wrap_height(text: str, w: int) -> int:
-    lines = []
-    for l in text.splitlines():
-        lines += textwrap.wrap(l, w)
-    return len(lines)
-
-
 def draw_message_box_options(
-    x: int, y: int, w: int, options: list[str], selected: int = 0
+    x: int,
+    y: int,
+    w: int,
+    options: list[str],
+    selected: int = 0,
+    palette: color.Palette = dialog_palette,
 ):
-    def normal_color():
-        term.color(term.colors.bright + term.colors.white)
-        term.bgcolor(term.colors.blue)
-
-    def selected_color():
-        term.bgcolor(term.colors.black)
-
     max_width = 0
     total_width = 0
     for opt in options:
@@ -73,7 +84,7 @@ def draw_message_box_options(
     count_opt = len(options)
     item_spacing = (w - (max_width * count_opt)) // (count_opt + 1)
 
-    normal_color()
+    term.set_color(palette["normal"])
 
     term.set_pos(x, y)
     for i in range(len(options)):
@@ -84,28 +95,40 @@ def draw_message_box_options(
         term.rawprint(" " * (item_spacing + offset))
 
         if i == selected:
-            selected_color()
+            term.set_color(palette["selected"])
+
         term.rawprint(f"[{opt}]")
 
         if i == selected:
-            normal_color()
+            term.set_color(palette["normal"])
 
 
-def message_box(title: str, text: str, options: list[str], selected: int = 0) -> int:
+def message_box(
+    title: str,
+    text: str,
+    options: list[str],
+    selected: int = 0,
+    palette: color.Palette = dialog_palette,
+) -> int:
     w, h = term.get_size()
 
-    max_width = get_max_width(text)
+    max_width = term.get_max_width(text)
     content_width = min(math.floor(w * 0.6), max_width)
-    content_height = get_wrap_height(text, content_width)
+    content_height = term.get_wrap_height(text, content_width)
     dialog_width = content_width + 4
     dialog_height = content_height + 6
 
-    x, y = draw_dialog(dialog_width, dialog_height, title)
+    x, y = draw_dialog(dialog_width, dialog_height, title, palette)
     term.draw_textblock_centered(text, x + 2, y + 1, content_width, content_height + 2)
 
     while True:
         draw_message_box_options(
-            x + 1, y + dialog_height - 2, dialog_width - 2, options, selected
+            x + 1,
+            y + dialog_height - 2,
+            dialog_width - 2,
+            options,
+            selected,
+            palette,
         )
 
         key = term.read_key()
@@ -145,14 +168,8 @@ def draw_select_box_items(
     prev_start: int,
     prev_end: int,
 ):
-    def normal_color():
-        term.color(term.colors.bright + term.colors.white)
-        term.bgcolor(term.colors.blue)
 
-    def selected_color():
-        term.bgcolor(term.colors.black)
-
-    normal_color()
+    term.set_color(dialog_palette["normal"])
     term.fill(x, y, w, h)
 
     items_draw, start_index, end_index = get_items_to_draw(
@@ -163,22 +180,26 @@ def draw_select_box_items(
     has_items_after = end_index < len(items)
 
     term.draw_text(
-        term.arrows["n"] if has_items_before else term.borders["we"], x + w - 1, y - 1
+        term.arrows["n"] if has_items_before else term.borders["we"],
+        x + w - 1,
+        y - 1,
     )
     term.draw_text(
-        term.arrows["s"] if has_items_after else term.borders["we"], x + w - 1, y + h
+        term.arrows["s"] if has_items_after else term.borders["we"],
+        x + w - 1,
+        y + h,
     )
 
     for i in range(len(items_draw)):
         item = items_draw[i]
 
         if item == items[selected]:
-            selected_color()
+            term.set_color(dialog_palette["selected"])
 
         term.draw_text(item, x, y + i)
 
         if item == items[selected]:
-            normal_color()
+            term.set_color(dialog_palette["normal"])
 
     return start_index, end_index
 
@@ -228,16 +249,8 @@ def select_item(item: object):
     item["value"] = value
 
 
-def draw_tabs(tabs: list[str], selected: int):
-    def normal_color():
-        term.color(term.colors.white)
-        term.bgcolor(term.colors.blue)
-
-    def selected_color():
-        term.color(term.colors.blue)
-        term.bgcolor(term.colors.white)
-
-    normal_color()
+def draw_tabs(tabs: list[str], selected: int, palette: color.Palette = header_palette):
+    term.set_color(palette["disabled"])
 
     w, h = term.get_size()
     term.fill(1, 2, w, 1)
@@ -245,19 +258,18 @@ def draw_tabs(tabs: list[str], selected: int):
 
     for i in range(len(tabs)):
         if i == selected:
-            selected_color()
+            term.set_color(palette["selected"])
 
         term.rawprint(f" {tabs[i]} ")
 
         if i == selected:
-            normal_color()
+            term.set_color(palette["disabled"])
 
 
 def draw_help_area():
     w, h = term.get_size()
 
-    term.color(term.colors.blue)
-    term.bgcolor(term.colors.white)
+    term.set_color(screen_palette["normal"])
 
     x = w - help_width + 2
     width = help_width - 2
@@ -267,8 +279,7 @@ def draw_help_area():
 
 
 def draw_help_text(text: str = ""):
-    term.color(term.colors.blue)
-    term.bgcolor(term.colors.white)
+    term.set_color(screen_palette["normal"])
 
     w, h = term.get_size()
 
@@ -279,26 +290,17 @@ def draw_help_text(text: str = ""):
     term.draw_text(text, x, 4, width)
 
 
-def get_sel_index(items: list, offset: int = -1, reverse: bool = False):
-    r = range(offset - 1, -1, -1) if reverse else range(offset + 1, len(items))
-    for i in r:
-        item = items[i]
-        if item:
-            return i
-    return offset
-
-
 def draw_scrollbar(x: int, y: int, h: int, current: int, total: int):
     if h > total:
         return
-    term.color(term.colors.bright + term.colors.black)
+    term.set_color_raw(term.colors.light + term.colors.black)
 
     sb_height = math.floor(h / total * (h - 2))
     sb_offset = math.floor(current / total * (h - sb_height - 1))
 
     term.fill(x, y + 1, 1, h - 1, term.blocks["ls"])
 
-    term.color(term.colors.blue)
+    term.set_color_raw(term.colors.blue)
     term.draw_text(term.arrows["n"], x, y)
     term.draw_text(term.arrows["s"], x, y + h - 1)
     term.fill(x, y + sb_offset + 1, 1, sb_height, term.blocks["full"])
@@ -316,17 +318,17 @@ def draw_items(
 ) -> tuple[int, int]:
 
     def normal_color():
-        term.color(term.colors.bright + term.colors.black)
+        term.set_color_raw(term.colors.light + term.colors.black)
 
     def selected_color():
-        term.color(term.colors.bright + term.colors.white)
+        term.set_color_raw(term.colors.light + term.colors.white)
 
     def editable_color():
-        term.color(term.colors.blue)
+        term.set_color_raw(term.colors.blue)
 
     pw = (w - 2) // 2
 
-    term.bgcolor(term.colors.white)
+    term.set_color(screen_palette["normal"])
     term.fill(x, y, w - 1, h)
     draw_scrollbar(x + w - 1, y, h, selected, len(items))
 
@@ -334,7 +336,7 @@ def draw_items(
         items, selected, prev_start, prev_end
     )
 
-    normal_color()
+    term.set_color(screen_palette["disabled"])
 
     for i in range(len(items_draw)):
         item = items_draw[i]
@@ -342,9 +344,9 @@ def draw_items(
             continue
 
         if start_index + i == selected:
-            selected_color()
+            term.set_color(screen_palette["selected"])
         elif "type" in item:
-            editable_color()
+            term.set_color(screen_palette["normal"])
 
         if "type" in item:
             if item["type"] == "subpage":
@@ -363,19 +365,21 @@ def draw_items(
 
             term.draw_text(text, x + 2 + pw, y + i, pw)
 
-        normal_color()
+        term.set_color(screen_palette["disabled"])
 
     return start_index, end_index
 
 
-def bios_page(pages: list):
+def bios_screen(pages_gen: bios.PageGenerators):
     term.clear()
     term.cursor(False)
 
     page_index = 0
+    page_total = len(pages_gen)
 
     tabs = []
-    for page in pages:
+    for page_gen in pages_gen:
+        page = page_gen()
         tabs += [page["title"]]
 
     keep_index = False
@@ -388,24 +392,23 @@ def bios_page(pages: list):
         w, h = term.get_size()
 
         # Draw title texts
-        term.color(term.colors.bright + term.colors.white)
-        term.bgcolor(term.colors.blue)
+        term.set_color(header_palette["normal"])
         term.draw_textblock_centered(title_string, 1, 1, w, 2)
-        term.color(term.colors.white)
+
+        term.set_color(header_palette["disabled"])
         term.draw_textblock_centered(version_string, 1, h - 1, w, 2)
 
         # Draw tabs
         draw_tabs(tabs, page_index)
 
         # Draw page background
-        term.color(term.colors.blue)
-        term.bgcolor(term.colors.white)
+        term.set_color(screen_palette["normal"])
         term.draw_box(1, 3, w, h - 4, [w - help_width])
 
         # Draw help sidebar
         draw_help_area()
 
-        page = pages[page_index]
+        page = pages_gen[page_index]()
         items = page["items"]
         item_view_start = 0
         item_view_end = h - 6
@@ -413,7 +416,7 @@ def bios_page(pages: list):
         if keep_index:
             keep_index = False
         else:
-            item_selected = get_sel_index(items)
+            item_selected = bios.get_selectable_index(items)
 
         while True:
             item = items[item_selected]
@@ -439,10 +442,10 @@ def bios_page(pages: list):
 
             if key == "UP":
                 # Go to previous item
-                item_selected = get_sel_index(items, item_selected, True)
+                item_selected = bios.get_selectable_index(items, item_selected, True)
             elif key == "DOWN":
                 # Go to next item
-                item_selected = get_sel_index(items, item_selected)
+                item_selected = bios.get_selectable_index(items, item_selected)
             elif key == "ENTER":
                 # Execute current item's function if available
                 keep_index = True
@@ -460,11 +463,11 @@ def bios_page(pages: list):
             elif key == "RIGHT":
                 # Go to next page
                 keep_index = False
-                page_index = min(len(pages) - 1, page_index + 1)
+                page_index = min(page_total - 1, page_index + 1)
                 break
             elif key == "ESC":
                 # Go to last page (Exit page)
-                page_index = len(pages) - 1
+                page_index = page_total - 1
                 break
             else:
                 term.beep()
