@@ -4,22 +4,9 @@ import textwrap
 import termios
 import tty
 import sys
+import color
 
 ESC = "\033["
-
-
-class colors:
-    black = 30
-    red = 31
-    green = 32
-    yellow = 33
-    blue = 34
-    magenta = 35
-    cyan = 36
-    white = 37
-
-    back = 10
-    bright = 60
 
 
 def rawprint(*values: object):
@@ -40,12 +27,19 @@ def reset():
     rawprint(ESC, "0m")
 
 
-def color(c: int):
+def set_color_raw(c: int):
     rawprint(ESC, c, "m")
 
 
+def set_color(c: tuple[int, int]):
+    # Set background
+    set_color_raw(color.back + c[0])
+    # Set foreground
+    set_color_raw(c[1])
+
+
 def bgcolor(c: int):
-    rawprint(ESC, colors.back + c, "m")
+    rawprint(ESC, color.back + c, "m")
 
 
 def set_pos(x: int, y: int):
