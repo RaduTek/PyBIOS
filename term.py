@@ -6,6 +6,11 @@ import tty
 import sys
 import color
 
+
+Rectangle = tuple[int, int, int, int]
+Size = tuple[int, int]
+Point = tuple[int, int]
+
 ESC = "\033["
 
 
@@ -18,7 +23,7 @@ def clear():
     rawprint(ESC, "2J")
 
 
-def get_size() -> tuple[int, int]:
+def get_size() -> Size:
     col, row = os.get_terminal_size()
     return col, row
 
@@ -31,7 +36,7 @@ def set_color_raw(c: int):
     rawprint(ESC, c, "m")
 
 
-def set_color(c: tuple[int, int]):
+def set_color(c: color.Color):
     # Set background
     set_color_raw(color.back + c[0])
     # Set foreground
@@ -42,20 +47,22 @@ def bgcolor(c: int):
     rawprint(ESC, color.back + c, "m")
 
 
-def set_pos(x: int, y: int):
+def set_pos(pt: Point):
+    x, y = pt
     rawprint(ESC, y, ";", x, "H")
 
 
-def fill(x: int, y: int, w: int, h: int, c: str = " "):
+def fill(rect: Rectangle, c: str = " "):
+    x, y, w, h = rect
     for i in range(y, y + h):
-        set_pos(x, i)
+        set_pos((x, i))
         rawprint(c * w)
 
 
 def exit_func():
     reset()
     clear()
-    set_pos(0, 0)
+    set_pos((1, 1))
     exit()
 
 
@@ -120,29 +127,28 @@ def gen_box_line(w: int, splits: list[int], chars: str) -> str:
 
 
 def draw_box(
-    x: int,
-    y: int,
-    w: int,
-    h: int,
+    rect: Rectangle,
     hsplit: list[int] = [],
     vsplit: list[int] = [],
 ):
+    x, y, w, h = rect
+
     line_t = gen_box_line(w, hsplit, borderProfiles.top)
     line = gen_box_line(w, hsplit, borderProfiles.middle)
     line_s = gen_box_line(w, hsplit, borderProfiles.middle_vsplit)
     line_b = gen_box_line(w, hsplit, borderProfiles.bottom)
 
-    set_pos(x, y)
+    set_pos((x, y))
     rawprint(line_t)
 
     for i in range(y + 1, y + h - 1):
-        set_pos(x, i)
+        set_pos((x, i))
         if (i - y + 1) in vsplit:
             rawprint(line_s)
         else:
             rawprint(line)
 
-    set_pos(x, y + h - 1)
+    set_pos((x, y + h - 1))
     rawprint(line_b)
 
 
@@ -150,15 +156,16 @@ def cursor(enabled: bool = True):
     rawprint(ESC, "?25", "h" if enabled else "l")
 
 
-def draw_vsplit(x: int, y: int, w: int):
+def draw_vsplit(pt: Point, w: int):
     line = gen_box_line(w, [], borderProfiles.middle_vsplit)
-    set_pos(x, y)
+    set_pos(pt)
     rawprint(line)
 
 
-def draw_text(text: str, x: int, y: int, w: int = 0, h: int = 0):
+def draw_text(text: str, rect: Rectangle):
+    x, y, w, h = rect
     if w == 0 and h == 0:
-        set_pos(x, y)
+        set_pos((x, y))
         rawprint(text)
     else:
         lines = []
@@ -166,19 +173,19 @@ def draw_text(text: str, x: int, y: int, w: int = 0, h: int = 0):
             lines += textwrap.wrap(l, w)
 
         for i in range(len(lines)):
-            set_pos(x, y + i)
+            set_pos((x, y + i))
             rawprint(lines[i])
 
 
-def draw_text_centered(text: str, x: int, y: int, w: int, space: str = " "):
-    set_pos(x, y)
+def draw_text_centered(text: str, rect: Rectangle, space: str = " "):
+    x, y, w, h = rect
+    set_pos((x, y))
     extra = w - len(text)
     rawprint(space * math.floor(extra / 2), text, space * math.ceil(extra / 2))
 
 
-def draw_textblock_centered(
-    text: str, x: int, y: int, w: int, h: int, space: str = " "
-):
+def draw_textblock_centered(text: str, rect: Rectangle, space: str = " "):
+    x, y, w, h = rect
     lines = []
     for l in text.splitlines():
         lines += textwrap.wrap(l, w)
@@ -188,7 +195,7 @@ def draw_textblock_centered(
         lines = ([""] * math.floor(extra / 2)) + lines + ([""] * math.ceil(extra / 2))
 
     for i in range(h):
-        set_pos(x, y + i)
+        set_pos((x, y + i))
         extra = w - len(lines[i])
         rawprint(space * math.floor(extra / 2), lines[i], space * math.ceil(extra / 2))
 
