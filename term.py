@@ -97,6 +97,20 @@ class borderProfiles:
     bottom = borders["ne"] + borders["we"] + borders["nwe"] + borders["nw"]
 
 
+def get_max_width(text: str) -> int:
+    width = 0
+    for l in text.splitlines():
+        width = max(len(l), width)
+    return width
+
+
+def get_wrap_height(text: str, w: int) -> int:
+    lines = []
+    for l in text.splitlines():
+        lines += textwrap.wrap(l, w)
+    return len(lines)
+
+
 def gen_box_line(w: int, splits: list[int], chars: str) -> str:
     line = chars[0]
     for split in splits:
