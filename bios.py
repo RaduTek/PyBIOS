@@ -24,6 +24,25 @@ def get_selectable_index(items: List[Item], offset: int = -1, reverse: bool = Fa
     return offset
 
 
+Range = tuple[int, int]
+
+
+def get_screen_range(selected: int, previous: Range) -> Range:
+    prev_start, prev_end = previous
+
+    start_index = prev_start
+    end_index = prev_end
+
+    if selected < prev_start:
+        start_index -= prev_start - selected
+        end_index -= prev_start - selected
+    elif selected >= prev_end:
+        start_index += selected - prev_end + 1
+        end_index += selected - prev_end + 1
+
+    return start_index, end_index
+
+
 PageGenerator = Callable[[], Page]
 PageGenerators = List[PageGenerator]
 
