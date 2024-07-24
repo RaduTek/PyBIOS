@@ -58,6 +58,13 @@ def fill(x: int, y: int, w: int, h: int, c: str = " "):
         rawprint(c * w)
 
 
+def exit_func():
+    reset()
+    clear()
+    set_pos(0, 0)
+    exit()
+
+
 borders = {
     "we": "\u2500",
     "ns": "\u2502",
