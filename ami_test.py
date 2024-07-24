@@ -1,5 +1,6 @@
-import term
+import bios
 import ami
+import term
 
 
 def save_exit_confirm(item):
@@ -28,7 +29,7 @@ def discard_confirm(item):
         item["value"] = "OK"
 
 
-exit_page = {
+exit_page: bios.Page = {
     "title": "Exit",
     "items": [
         {
@@ -62,88 +63,89 @@ def test_dialog(item):
     r = ami.message_box("Title", "Are you sure to perform?", ["Yes", "No"])
     if r == 0:
         item["value"] = "Clear"
-    return item
 
 
-main_items = [
-    {
-        "title": "Project Version",
-        "value": "1.23.4567",
-    },
-    {
-        "title": "Project Build Date",
-        "value": "01/01/1970",
-    },
-    None,
-    {
-        "title": "System Date",
-        "value": "01/01/1970",
-        "type": "option",
-        "help": "Set the current system date",
-        "function": test_dialog,
-    },
-    {
-        "title": "System Time",
-        "value": "00:00:00",
-        "type": "option",
-        "help": "Set the current system time",
-    },
-    None,
-    {
-        "title": "Hardware Information",
-        "type": "subpage",
-        "help": "View details about installed hardware",
-    },
-]
+main_page: bios.Page = {
+    "title": "Main",
+    "items": [
+        {
+            "title": "Project Version",
+            "value": "1.23.4567",
+        },
+        {
+            "title": "Project Build Date",
+            "value": "01/01/1970",
+        },
+        None,
+        {
+            "title": "System Date",
+            "value": "01/01/1970",
+            "type": "option",
+            "level": 0,
+            "help": "Set the current system date",
+            "function": test_dialog,
+        },
+        {
+            "title": "System Time",
+            "value": "00:00:00",
+            "type": "option",
+            "level": 0,
+            "help": "Set the current system time",
+        },
+        None,
+        {
+            "title": "Hardware Information",
+            "type": "subpage",
+            "level": 0,
+            "help": "View details about installed hardware",
+        },
+    ],
+}
 
 
-boot_items = [
-    {
-        "title": "Boot mode",
-        "type": "select",
-        "values": [
-            "UEFI only",
-            "UEFI and CSM",
-            "Legacy",
-        ],
-        "value": 0,
-        "help": "Set the UEFI boot mode\n"
-        + "UEFI only = Boot only UEFI devices\n"
-        + "UEFI and CSM = Boot both UEFI and legacy devices\n"
-        + "Legacy = Boot only legacy devices",
-    },
-    {
-        "title": "Network boot",
-        "type": "select",
-        "values": ["Disabled", "Enabled"],
-        "value": 1,
-        "help": "Enable/Disable network boot",
-    },
-    None,
-    {
-        "title": "Change boot order",
-        "type": "option",
-        "help": "Edit the order of boot devices",
-        "function": test_dialog,
-    },
-]
+boot_page: bios.Page = {
+    "title": "Boot",
+    "items": [
+        {
+            "title": "Boot mode",
+            "type": "select",
+            "values": [
+                "UEFI only",
+                "UEFI and CSM",
+                "Legacy",
+            ],
+            "value": 0,
+            "help": "Set the UEFI boot mode\n"
+            + "UEFI only = Boot only UEFI devices\n"
+            + "UEFI and CSM = Boot both UEFI and legacy devices\n"
+            + "Legacy = Boot only legacy devices",
+        },
+        {
+            "title": "Network boot",
+            "type": "select",
+            "values": ["Disabled", "Enabled"],
+            "value": 1,
+            "help": "Enable/Disable network boot",
+        },
+        None,
+        {
+            "title": "Change boot order",
+            "type": "option",
+            "help": "Edit the order of boot devices",
+            "function": test_dialog,
+        },
+    ],
+}
 
-
-main_pages = [
-    {
-        "title": "Main",
-        "items": main_items,
-    },
-    {
-        "title": "Boot",
-        "items": boot_items,
-    },
-    exit_page,
+admin_pages: bios.PageGenerators = [
+    bios.new_page_generator(main_page),
+    bios.new_page_generator(boot_page),
+    bios.new_page_generator(exit_page),
 ]
 
 
 def main():
-    ami.bios_page(main_pages)
+    ami.bios_screen(admin_pages)
 
 
 if __name__ == "__main__":
