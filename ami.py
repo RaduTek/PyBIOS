@@ -223,10 +223,9 @@ def select_box(title: str, items: list[str], selected: int = 0) -> int:
             term.beep()
 
 
-def select_item(item: object) -> object:
+def select_item(item: object):
     value = select_box(item["title"], item["values"], item["value"])
     item["value"] = value
-    return item
 
 
 def draw_tabs(tabs: list[str], selected: int):
@@ -369,138 +368,6 @@ def draw_items(
     return start_index, end_index
 
 
-def exit_func():
-    term.reset()
-    term.clear()
-    term.set_pos(0, 0)
-    exit()
-
-
-def exit_confirm(item):
-    r = message_box(
-        "Save Changes and Exit", "Save configuration and reset?", ["Yes", "No"]
-    )
-    if r == 0:
-        exit_func()
-    return item
-
-
-def test_dialog(item):
-    r = message_box("Title", "Are you sure to perform?", ["Yes", "No"])
-    if r == 0:
-        item["value"] = "Clear"
-    return item
-
-
-main_items = [
-    {
-        "title": "Project Version",
-        "value": "1.23.4567",
-    },
-    {
-        "title": "Project Build Date",
-        "value": "01/01/1970",
-    },
-    None,
-    {
-        "title": "System Date",
-        "value": "01/01/1970",
-        "type": "option",
-        "help": "Set the current system date",
-        "function": test_dialog,
-    },
-    {
-        "title": "System Time",
-        "value": "00:00:00",
-        "type": "option",
-        "help": "Set the current system time",
-    },
-    None,
-    {
-        "title": "Hardware Information",
-        "type": "subpage",
-        "help": "View details about installed hardware",
-    },
-]
-
-
-boot_items = [
-    {
-        "title": "Boot mode",
-        "type": "select",
-        "values": [
-            "UEFI only",
-            "UEFI and CSM",
-            "Legacy",
-            "Legacy 1",
-            "Legacy 2",
-            "Legacy 3",
-            "Legacy 4",
-            "Legacy 5",
-            "Legacy 6",
-            "Legacy 7",
-            "Legacy 8",
-            "Legacy 9",
-        ],
-        "value": 1,
-        "help": "Set the UEFI boot mode\nUEFI and CSM = Boot both UEFI and legacy devices\n"
-        + "UEFI = Boot only UEFI devices\nLegacy = Boot only legacy devices",
-    },
-    {
-        "title": "Network boot",
-        "type": "select",
-        "values": ["Disabled", "Enabled"],
-        "value": 1,
-        "help": "Enable/Disable network boot",
-    },
-    None,
-    {
-        "title": "Change boot order",
-        "type": "option",
-        "help": "Edit the order of boot devices",
-        "function": test_dialog,
-    },
-]
-
-
-def_pages = [
-    {
-        "title": "Main",
-        "items": main_items,
-    },
-    {
-        "title": "Boot",
-        "items": boot_items,
-    },
-    {
-        "title": "Exit",
-        "items": [
-            {
-                "title": "Save Changes and Exit",
-                "type": "option",
-                "help": "Save changed settings and reset the computer\nF10 can be used for this",
-                "function": exit_confirm,
-            },
-            {
-                "title": "Discard Changes and Exit",
-                "type": "option",
-                "help": "Discard changed settings and reset the computer",
-            },
-            {
-                "title": "Discard Changes",
-                "type": "option",
-                "help": "Discard changed settings",
-            },
-            {
-                "title": "Restore Defaults",
-                "type": "option",
-                "help": "Restore all settings to defaults and reset the computer",
-            },
-        ],
-    },
-]
-
-
 def bios_page(pages: list):
     term.clear()
     term.cursor(False)
@@ -581,9 +448,9 @@ def bios_page(pages: list):
                 keep_index = True
                 if "type" in item:
                     if "function" in item:
-                        item = item["function"](item)
+                        item["function"](item)
                     elif item["type"] == "select":
-                        item = select_item(item)
+                        select_item(item)
                     break
             elif key == "LEFT":
                 # Go to previous page
@@ -601,11 +468,3 @@ def bios_page(pages: list):
                 break
             else:
                 term.beep()
-
-
-def main():
-    bios_page(def_pages)
-
-
-if __name__ == "__main__":
-    main()
