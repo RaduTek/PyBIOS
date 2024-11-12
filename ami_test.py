@@ -65,6 +65,30 @@ def test_dialog(item):
         item["value"] = "Clear"
 
 
+hwinfo_page: bios.Page = {
+    "title": "Hardware Info",
+    "items": [
+        {
+            "title": "Project Version",
+            "value": "1.23.4567",
+        },
+        {
+            "title": "Project Build Date",
+            "value": "01/01/1970",
+        },
+        None,
+        {
+            "title": "Project Version",
+            "value": "1.23.4567",
+        },
+        {
+            "title": "Project Build Date",
+            "value": "01/01/1970",
+        },
+    ],
+}
+
+
 main_page: bios.Page = {
     "title": "Main",
     "items": [
@@ -98,6 +122,7 @@ main_page: bios.Page = {
             "type": "subpage",
             "level": 0,
             "help": "View details about installed hardware",
+            "subpage": bios.new_page_generator(hwinfo_page),
         },
     ],
 }
