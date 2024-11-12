@@ -59,7 +59,9 @@ def select_item(item: object):
     item["value"] = value
 
 
-def draw_tabs(tabs: list[str], selected: int, palette: color.Palette = header_palette):
+def draw_tabs(
+    tabs: list[str], selected: int, palette: color.Palette, selected_only: bool = False
+):
     term.set_color(palette["disabled"])
 
     w, h = term.get_size()
@@ -70,7 +72,10 @@ def draw_tabs(tabs: list[str], selected: int, palette: color.Palette = header_pa
         if i == selected:
             term.set_color(palette["selected"])
 
-        term.rawprint(f" {tabs[i]} ")
+        if selected_only and i != selected:
+            term.rawprint(" " * (len(tabs[i]) + 2))
+        else:
+            term.rawprint(f" {tabs[i]} ")
 
         if i == selected:
             term.set_color(palette["disabled"])
@@ -100,98 +105,121 @@ def draw_help_text(text: str = ""):
     term.draw_text(text, (x, 4, width, 0))
 
 
-def bios_screen(pages_gen: bios.PageGenerators):
+def draw_screen(tabs: list[str], page_index: str, is_subpage: bool = False):
+    w, h = term.get_size()
+
+    # Draw title texts
+    term.set_color(header_palette["normal"])
+    term.draw_textblock_centered(title_string, (1, 1, w, 2))
+
+    term.set_color(header_palette["disabled"])
+    term.draw_textblock_centered(version_string, (1, h - 1, w, 2))
+
+    # Draw tabs
+    draw_tabs(
+        tabs=tabs,
+        selected=page_index,
+        palette=header_palette,
+        selected_only=is_subpage,
+    )
+
+    # Draw page background
+    term.set_color(screen_palette["normal"])
+    term.draw_box((1, 3, w, h - 4), [w - help_width])
+
+    # Draw help sidebar
+    draw_help_area()
+
+
+def bios_page(page_gen: bios.PageGenerator) -> int:
+    w, h = term.get_size()
+
+    page = page_gen()
+    items = page["items"]
+
+    item_range = (0, h - 7)
+    item_selected = bios.get_selectable_index(items)
+
+    while True:
+        page = page_gen()
+        items = page["items"]
+
+        item = items[item_selected]
+
+        # Draw items
+        item_range = ui.draw_items(
+            items,
+            item_selected,
+            item_range,
+            (2, 4, w - help_width - 2, h - 6),
+            screen_palette,
+        )
+
+        # Draw help text for currently selected item
+        draw_help_text(item["help"] if "help" in item else item["title"])
+
+        # Read key
+        term.set_pos((w, h))
+        key = term.read_key()
+
+        if key == "UP":
+            # Go to previous item
+            item_selected = bios.get_selectable_index(items, item_selected, True)
+        elif key == "DOWN":
+            # Go to next item
+            item_selected = bios.get_selectable_index(items, item_selected)
+        elif key == "ENTER":
+            # Execute current item's function if available
+            if "type" in item:
+                if "function" in item:
+                    item["function"](item)
+                elif "subpage" in item:
+                    bios_page(item["subpage"])
+                elif item["type"] == "select":
+                    select_item(item)
+        elif key == "LEFT":
+            # Go to previous page
+            return -2
+        elif key == "RIGHT":
+            # Go to next page
+            return -3
+        elif key == "ESC":
+            # Go to last page (Exit page)
+            return -4
+        else:
+            term.beep()
+
+
+def bios_screen(
+    pages_gen: bios.PageGenerators, page_index: int = 0, is_subpage: bool = False
+):
     term.clear()
     term.cursor(False)
-
-    page_index = 0
-    page_total = len(pages_gen)
-    item_range: bios.Range = (0, 0)
 
     tabs = []
     for page_gen in pages_gen:
         page = page_gen()
         tabs += [page["title"]]
 
-    keep_index = False
+    page_total = len(pages_gen)
 
     while True:
-        w, h = term.get_size()
+        draw_screen(tabs, page_index, is_subpage)
 
-        # Draw title texts
-        term.set_color(header_palette["normal"])
-        term.draw_textblock_centered(title_string, (1, 1, w, 2))
+        new_index = bios_page(pages_gen[page_index])
 
-        term.set_color(header_palette["disabled"])
-        term.draw_textblock_centered(version_string, (1, h - 1, w, 2))
-
-        # Draw tabs
-        draw_tabs(tabs, page_index)
-
-        # Draw page background
-        term.set_color(screen_palette["normal"])
-        term.draw_box((1, 3, w, h - 4), [w - help_width])
-
-        # Draw help sidebar
-        draw_help_area()
-
-        page = pages_gen[page_index]()
-        items = page["items"]
-
-        item_range = (0, h - 7)
-
-        if keep_index:
-            keep_index = False
-        else:
-            item_selected = bios.get_selectable_index(items)
-
-        while True:
-            item = items[item_selected]
-
-            # Draw items
-            item_range = ui.draw_items(
-                items,
-                item_selected,
-                item_range,
-                (2, 4, w - help_width - 2, h - 6),
-                screen_palette,
-            )
-
-            # Draw help text for currently selected item
-            draw_help_text(item["help"] if "help" in item else item["title"])
-
-            # Read key
-            term.set_pos((w, h))
-            key = term.read_key()
-
-            if key == "UP":
-                # Go to previous item
-                item_selected = bios.get_selectable_index(items, item_selected, True)
-            elif key == "DOWN":
-                # Go to next item
-                item_selected = bios.get_selectable_index(items, item_selected)
-            elif key == "ENTER":
-                # Execute current item's function if available
-                keep_index = True
-                if "type" in item:
-                    if "function" in item:
-                        item["function"](item)
-                    elif item["type"] == "select":
-                        select_item(item)
-                    break
-            elif key == "LEFT":
+        if not is_subpage:
+            if new_index == -1:
+                # Stay on current page
+                pass
+            elif new_index == -2:
                 # Go to previous page
-                keep_index = False
                 page_index = max(0, page_index - 1)
-                break
-            elif key == "RIGHT":
+            elif new_index == -3:
                 # Go to next page
-                keep_index = False
                 page_index = min(page_total - 1, page_index + 1)
-                break
-            elif key == "ESC":
-                # Go to last page (Exit page)
+            elif new_index == -4:
+                # Go to last page
                 page_index = page_total - 1
-                break
             else:
-                term.beep()
+                page_index = new_index
